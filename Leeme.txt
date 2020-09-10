@@ -1,0 +1,17 @@
+Para este laboratorio, ocupamos la libreria png,
+por lo tanto para hacer uso, se debe descargar esta libreria con el comando siguiente:
+
+sudo apt-get install libpng-dev
+sudo apt-get install libss1-dev
+sudo apt-get install zlip1g-dev
+
+Luego de eso, se procede a compilar los archivos con el comando en la consola
+
+make
+
+Para hacer uso del programa hacer el comando:
+
+./pipeline -c <cantidad imagenes> -f <nombre archivo de filtro.txt> -n <umbral> -b 
+
+El parametro <-b> es opcional.
+Las imagenes tiene que tener como dimensión máxima de 120x120px
