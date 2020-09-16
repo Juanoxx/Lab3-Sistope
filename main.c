@@ -1,3 +1,9 @@
+/*Laboratorio número tres de Sistemas operativos - 1 - 2020*/
+/*Integrantes: Hugo Arenas - Juan Arredondo*/
+/*Profesor: Fernando Rannou*/
+
+
+/*Se importan las librerías*/
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -11,6 +17,10 @@
 #include "matrixf.h"
 #include "listmf.h"
 #include "funciones.h"
+#include <stdint.h>
+#include <math.h>
+#include "jpeglib.h"
+#include <setjmp.h>
 
 //Primer mutex para la lectura y escritura del buffer.
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -409,36 +419,41 @@ int main(int argc, char *argv[]){ /*Main principal de la funcion*/
     char *nflag = (char*)malloc(100*sizeof(char));
 	char *hflag = (char*)malloc(100*sizeof(char));
 	char *tflag = (char*)malloc(100*sizeof(char));
+	char *uflag = (char*)malloc(100*sizeof(char));
     int numeroImagenes=0;
 	int numeroHebras=0;
 	int largoBuffer=0;
 	int umbral=0;
     int caso;
     int mostrar=0;
-    while((caso=getopt(argc,argv, "c:m:n:h:t:b"))!= -1){
+    while((caso=getopt(argc,argv, "c:h:u:n:b:m:f"))!= -1){
         switch(caso){
             case 'c':
         
                 strcpy(cflag, optarg); /*Numero Cantidad imagenes*/
         
+                break;
+            case 'h':
+                strcpy(hflag, optarg); /*Numero Cantidad hebras*/
                 break;    
+
+            case 'u':
+                strcpy(uflag, optarg); /*Umbral de binarizacion*/
+                break;  
+
+            case 'n':
+                strcpy(nflag, optarg); /*Numero Umbral clasificacion*/
+                break;	
+
+            case 'b':
+                strcpy(tflag, optarg); /*Numero Largo Buffer*/
+                break;
+
             case 'm':
                 strcpy(mflag, optarg); /*Archivo mascara filtro .txt*/
                 break;  
-            
-            case 'n':
-                strcpy(nflag, optarg); /*Numero Umbral clasificacion*/
-                break;
-				
-			case 'h':
-                strcpy(hflag, optarg); /*Numero Cantidad hebras*/
-                break;
-			
-			case 't':
-                strcpy(tflag, optarg); /*Numero Largo Buffer*/
-                break;
         
-            case 'b': /*Se muestra o no por pantalla*/
+            case 'f': /*Se muestra o no por pantalla*/
                 mostrar=1;
                 break;
              default:

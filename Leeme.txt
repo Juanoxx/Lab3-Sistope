@@ -1,9 +1,7 @@
-Para este laboratorio, ocupamos la libreria png,
+Para este laboratorio, ocupamos la libreria jpg,
 por lo tanto para hacer uso, se debe descargar esta libreria con el comando siguiente:
 
-sudo apt-get install libpng-dev
-sudo apt-get install libss1-dev
-sudo apt-get install zlip1g-dev
+sudo apt-get install libjpeg-dev
 
 Luego de eso, se procede a compilar los archivos con el comando en la consola
 
@@ -11,7 +9,7 @@ make
 
 Para hacer uso del programa hacer el comando:
 
-./pipeline -c <cantidad imagenes> -f <nombre archivo de filtro.txt> -n <umbral> -b 
+./pipeline -c <cantidad imagenes> -h <cantidad hebras> -u <umbral de binarización> -n <umbral de clasificación> -b <tamaño del buffer>  -m <<nombre archivo de filtro.txt> -f <bandera>
 
-El parametro <-b> es opcional.
+El parametro <-f> es opcional.
 Las imagenes tiene que tener como dimensión máxima de 120x120px
