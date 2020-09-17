@@ -13,14 +13,35 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <pthread.h>
-#include <png.h>
-#include "matrixf.h"
+#include "matrixF.h"
 #include "listmf.h"
 #include "funciones.h"
 #include <stdint.h>
 #include <math.h>
 #include "jpeglib.h"
 #include <setjmp.h>
+
+matrixF *convertFilter(char **datefilter, int cont);
+
+matrixF *conversion(matrixF *mf);
+
+matrixF *filtracion(matrixF *mf, matrixF *filter);
+
+matrixF *binarizacion(matrixF *mf, int umbral);
+
+GLOBAL(void) escribirJPG(char *nombre, matrixF *mf, int fil, int col);
+void clasificacion(matrixF *mf, int umbral, char *namefile, int aux);
+
+METHODDEF(void) my_error_exit (j_common_ptr cinfo);
+
+GLOBAL(matrixF*) leerJPG(char *nombre);
+
+/*Estructura para manejar imágenes tipo .jpg*/
+struct my_error_mgr {
+  struct jpeg_error_mgr pub;	
+  jmp_buf setjmp_buffer;
+};
+typedef struct my_error_mgr * my_error_ptr;
 
 //Primer mutex para la lectura y escritura del buffer.
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -37,10 +58,10 @@ funciones args;
 
 //Entradas: Puntero de tipo png_bytep, el largo y ancho de tipo int de la matriz entrante.
 //Funcionamiento: Realiza la conversion de una matriz a escala de grises.
-//Salidas: matrixf, el cual sirve como entrada para las demas funciones.
+//Salidas: matrixF, el cual sirve como entrada para las demas funciones.
 
-matrixf *grayScale(png_bytep *row_pointers, int height, int width) {
-  matrixf *mf = createMF(height, width);
+/*matrixF *grayScale(png_bytep *row_pointers, int height, int width) {
+  matrixF *mf = createMF(height, width);
   for(int y = 0; y < height; y++) {
     png_bytep row = row_pointers[y];
     for(int x = 0; x < width; x++) {
@@ -50,236 +71,133 @@ matrixf *grayScale(png_bytep *row_pointers, int height, int width) {
     }
   }
   return mf;
+}*/
+
+METHODDEF(void)
+my_error_exit (j_common_ptr cinfo){
+	my_error_ptr myerr = (my_error_ptr) cinfo->err;
+	(*cinfo->err->output_message) (cinfo);
+	longjmp(myerr->setjmp_buffer, 1);
 }
 
-
-
-//Entradas: Nombre de la imagen entrante de tipo char, matriz vacia para guarda la imagen, 
-//          parametros importantes del formato png.
-//Funcionamiento: realiza la lectura de la imagen entrante.
-//Salidas: matrixf, correspondiente a los pixeles de la imagen y el cual sirve como entrada 
-//         para las demas funciones.
-
-matrixf* readPNG(char *nombre, matrixf *mf, int width, int height, png_byte color_type,
-  png_byte bit_depth, png_bytep *row_pointers) {
-  FILE *archivo = fopen(nombre, "rb");
-  png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-  png_infop info = png_create_info_struct(png);
-  png_init_io(png, archivo);
-  png_read_info(png, info);
-  width      = png_get_image_width(png, info);
-  height     = png_get_image_height(png, info);
-  color_type = png_get_color_type(png, info);
-  bit_depth  = png_get_bit_depth(png, info);
-  png_read_update_info(png, info);
-  row_pointers = (png_bytep*)malloc(sizeof(png_bytep) * height);
-  for(int y = 0; y < height; y++) {
-    row_pointers[y] = (png_byte*)malloc(png_get_rowbytes(png,info));
-  }
-  png_read_image(png, row_pointers);
-  fclose(archivo);
-  png_destroy_read_struct(&png, &info, NULL);
-  mf = grayScale(row_pointers, height, width);
-  return mf;
-}
-
-//Entradas: La matriz resultante de etapas anteriores, y el filtro necesario para hacer la convolution.
-//Funcionamiento: Aplica la convolution, el filtro a la matriz entrante.
-//Salidas: matrixf,correspondiente a la matriz filtrada y el cual sirve como entrada para las demas funciones.
-
-matrixf *bidirectionalConvolution(matrixf *mf, matrixf *filter){
-	if ((countFil(filter) == countColumn(filter))&&(countFil(filter)%2 == 1)){
-		int increase = 0, initial = countFil(filter);
-		while (initial != 1){
-			initial = initial - 2;
-			increase = increase + 1;
-		}
-		for (int cont = 0; cont < increase; cont++){
-			mf = amplifyMF(mf);
-		}
-		for (int fil = 0; fil < countFil(mf) - countFil(filter); fil++){
-			for (int col = 0; col < countColumn(mf) - countColumn(filter); col++){
-				float sum = 0.0000;
-				for (int y = 0; y < countFil(filter); y++){
-					for (int x = 0; x < countColumn(filter); x++){
-						float result = getDateMF(filter, y, x)*getDateMF(mf, y + fil, x + col);
-						sum = sum + result;
-					}
-				}
-				mf = setDateMF(mf, fil + (countFil(filter)/2), col + (countColumn(filter)/2), sum);
-			}
-		}
-		for (int cont2 = 0; cont2 < increase; cont2++){
-			mf = decreaseMF(mf);
-		}
-		return mf;
+/*Función que se encarga de leer imágen en formato .jpg*/
+/*Entrada: Imágen jpg.*/
+/* Salida: Imagen leída, caso contrario retorna cero*/
+GLOBAL(matrixF*)
+leerJPG(char *nombre){
+	struct jpeg_decompress_struct cinfo;
+	struct my_error_mgr jerr;
+	FILE * imagen;
+	JSAMPARRAY buffer;
+	int row_stride;
+	if ((imagen = fopen(nombre, "rb")) == NULL) {
+		fprintf(stderr, "can't open %s\n", nombre);
+		return 0;
 	}
-	else{
-		return mf;
+	cinfo.err = jpeg_std_error(&jerr.pub);
+	jerr.pub.error_exit = my_error_exit;
+	if (setjmp(jerr.setjmp_buffer)) {
+		jpeg_destroy_decompress(&cinfo);
+		fclose(imagen);
+		return 0;
 	}
-}
-
-//Entradas: La matriz resultante de etapas anteriores.
-//Funcionamiento: Aplica la rectificacion, recorre cada pixel de la matriz, verificando si es positivo 
-//                (se mantiene pixel 0 es 255 si es mayor que este) o negativo (se cambia por 0).
-//Salidas: matrixf, el cual sirve como entrada para las demas funciones.
-
-matrixf *rectification(matrixf *mf){
-	for (int y = 0; y < countFil(mf); y++){
-		for (int x = 0; x < countColumn(mf); x++){
-			if (getDateMF(mf,y,x) < 0.0000){
-				mf = setDateMF(mf, y, x, 0.0000);
-			}
-			if (getDateMF(mf,y,x) > 255.0000){
-				mf = setDateMF(mf, y, x, 255.0000);
+	jpeg_create_decompress(&cinfo);
+	jpeg_stdio_src(&cinfo, imagen);
+	(void) jpeg_read_header(&cinfo, TRUE);
+	(void) jpeg_start_decompress(&cinfo);
+	row_stride = cinfo.output_width * cinfo.output_components;
+	unsigned char* filaPixel = (unsigned char*)malloc( cinfo.output_width*cinfo.output_height*cinfo.num_components );
+	buffer = (*cinfo.mem->alloc_sarray)((j_common_ptr) &cinfo, JPOOL_IMAGE, row_stride, 1);
+	int acum = 0;
+	while (cinfo.output_scanline < cinfo.output_height) {
+		(void) jpeg_read_scanlines(&cinfo, buffer, 1);
+		for(int i = 0;i < cinfo.image_width*cinfo.num_components;i++){
+			filaPixel[i + acum] = buffer[0][i];
+			if (i == cinfo.image_width*cinfo.num_components - 1){
+				acum = acum + i + 1;
 			}
 		}
 	}
+	matrixF *mf = createMF(cinfo.image_height, cinfo.image_width*3);
+	for (int i = 0; i < cinfo.image_height; i++){
+		for(int j = 0; j < cinfo.image_width; j++)
+		{
+			mf = setDateMF(mf,i,j*3,(float)filaPixel[(i*cinfo.image_width*3)+(j*3)+0]);
+			mf = setDateMF(mf,i,j*3 + 1,(float)filaPixel[(i*cinfo.image_width*3)+(j*3)+1]);
+			mf = setDateMF(mf,i,j*3 + 2,(float)filaPixel[(i*cinfo.image_width*3)+(j*3)+2]);
+		}
+	}
+	(void) jpeg_finish_decompress(&cinfo);
+	jpeg_destroy_decompress(&cinfo);
+	fclose(imagen);
 	return mf;
 }
 
+// Funcion: Escribe un archivo en formato png, resultante
+// Entrada: en nombre del archivo y lamatriz resultante.
+// Salida: void
+GLOBAL(void)
+escribirJPG(char *nombre, matrixF *mf, int fil, int col){
+	struct jpeg_compress_struct cinfo;
+	struct jpeg_error_mgr jerr;
+	FILE * outfile;		/* target file */
+	JSAMPROW row_pointer[1];	/* pointer to JSAMPLE row[s] */
+	int row_stride;		/* physical row width in image buffer */
+	cinfo.err = jpeg_std_error(&jerr);
+	jpeg_create_compress(&cinfo);
+	if ((outfile = fopen(nombre, "wb")) == NULL) {
+		fprintf(stderr, "can't open %s\n", nombre);
+		exit(1);
+	}
 
-//Entradas: La matriz resultante de etapas anteriores.
-//Funcionamiento: Realiza la etapa de pooling, en el cual obtiene de la matriz entrante el 
-//                largo y ancho, para poder reducir la matriz resultante.
-//Salidas: matrixf, correspondiente a la matrix resultando al aplicar el pooling y el cual 
-//         sirve como entrada para las demas funciones.
-
-matrixf *pooling(matrixf *mf){
-	int heigth = 0, width = 0;
-	if (countFil(mf)%2 == 0){
-		heigth = countFil(mf)/2;
-	}
-	if (countFil(mf)%2 == 1){
-		heigth = (countFil(mf)/2) + 1;
-	}
-	if (countColumn(mf)%2 == 0){
-		width = countColumn(mf)/2;
-	}
-	if (countColumn(mf)%2 == 1){
-		width = (countColumn(mf)/2) + 1;
-	}
-	matrixf *newmf = createMF(heigth, width);
-	int fil = 0, col = 0, fil2 = 0, col2 = 0;
-	while (fil < countFil(mf)){
-		col2 = 0;
-		col = 0;
-		while (col < countColumn(mf)){
-			float max = 0.0000;
-			for (int y = 0; y < 2; y++){
-				for (int x = 0; x < 2; x++){
-					if (max < getDateMF(mf, y+fil, x+col)){
-						max = getDateMF(mf, y+fil, x+col);
-					}
-				}
-			}
-			newmf = setDateMF(newmf, fil2, col2, max);
-			col = col + 2;
-			col2 = col2 + 1;
+	jpeg_stdio_dest(&cinfo, outfile);
+	cinfo.image_width = col; 	/* image width and height, in pixels */
+	cinfo.image_height = fil;
+	cinfo.input_components = 3;		/* # of color components per pixel */
+	cinfo.in_color_space = JCS_RGB; 	/* colorspace of input image */
+	jpeg_set_defaults(&cinfo);
+	jpeg_set_quality(&cinfo, 10, TRUE /* limit to baseline-JPEG values */);
+	jpeg_start_compress(&cinfo, TRUE);
+	row_stride = col * 3;	/* JSAMPLEs per row in image_buffer */
+	JSAMPLE *buffer = (JSAMPLE*)malloc(fil*col*3*sizeof(JSAMPLE));
+	unsigned char* pixel_row = (unsigned char*)(buffer);
+	for (int i = 0; i < cinfo.jpeg_height; i++){
+		for(int j = 0; j < cinfo.jpeg_width; j++)
+		{
+			pixel_row[(i*cinfo.jpeg_width*3)+(j*3)+0]=(unsigned char)((int)getDateMF(mf, i, j));
+			pixel_row[(i*cinfo.jpeg_width*3)+(j*3)+1]=(unsigned char)((int)getDateMF(mf, i, j));
+			pixel_row[(i*cinfo.jpeg_width*3)+(j*3)+2]=(unsigned char)((int)getDateMF(mf, i, j));
 		}
-		fil = fil + 2;
-		fil2 = fil2 + 1;
+	}
+	buffer = pixel_row;
+	while (cinfo.next_scanline < cinfo.image_height) {
+		row_pointer[0] = &buffer[cinfo.next_scanline * row_stride];
+		(void) jpeg_write_scanlines(&cinfo, row_pointer, 1);
+	}
+	jpeg_finish_compress(&cinfo);
+	fclose(outfile);
+	jpeg_destroy_compress(&cinfo);
+}
+
+/*Función que se encarga de convertir pixeles en escala de grises*/
+/*Entrada: pixeles, alto y largo.*/
+/* Salida: Matriz con escala de grises*/
+matrixF *conversion(matrixF *mf) {
+	matrixF *newmf = createMF(countFil(mf), countColumn(mf)/3);
+	for(int y = 0; y < countFil(newmf); y++) {
+		for(int x = 0; x < countColumn(newmf); x++) {
+			float prom = getDateMF(mf,y,x*3)*0.299+getDateMF(mf,y,x*3 + 1)*0.587+getDateMF(mf,y,x*3 + 2)*0.114;
+			newmf = setDateMF(newmf, y, x, prom);
+		}
 	}
 	return newmf;
 }
 
-//Entradas: La matriz resultante de etapas anteriores, como tambien el nombre de la imagen saliente (out_1.png).
-//Funcionamiento: Realiza el proceso de escribir la matriz resultante, en una imagen de formato .png.
-//Salidas: Void.
+/*Función que se encarga de convertir el filtro en una matriz para aplicar la convolución*/
+/*Entrada: Valores de convolución y contador.*/
+/* Salida: EMatriz de convolución*/
 
-void escribirPNG(char *filename, matrixf *mf) {
-  FILE *filepng = fopen(filename, "wb");
-  png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-  png_infop info = png_create_info_struct(png);
-  png_init_io(png, filepng);
-  png_set_IHDR(
-    png,
-    info,
-    countColumn(mf), countFil(mf),
-    8,
-    PNG_COLOR_TYPE_RGB,
-    PNG_INTERLACE_NONE,
-    PNG_COMPRESSION_TYPE_BASE,
-    PNG_FILTER_TYPE_BASE
-  );
-  png_write_info(png, info);  
-  png_bytep *row_pointers = (png_bytep*)malloc(sizeof(png_bytep) * countFil(mf));
-  for(int y = 0; y < countFil(mf); y++) {
-    row_pointers[y] = (png_byte*)malloc(png_get_rowbytes(png,info));
-  }
-  for(int y = 0; y < countFil(mf); y++) {
-    for(int x = 0; x < countColumn(mf); x++) {
-	  (&(row_pointers[y][x * 3]))[0] = (int)getDateMF(mf, y, x);
-	  (&(row_pointers[y][x * 3]))[1] = (int)getDateMF(mf, y, x);
-	  (&(row_pointers[y][x * 3]))[2] = (int)getDateMF(mf, y, x);
-    }
-  } 
-  png_write_image(png, row_pointers);
-  png_write_end(png, NULL); 
-  for(int y = 0; y < countFil(mf); y++) {
-    free(row_pointers[y]);
-  }
-  free(row_pointers);
-  fclose(filepng);
-  png_destroy_write_struct(&png, &info);
-}
-
-//Entradas: Lista de matrices, el umbral como entero, el cual indica el punto de clasificacion, el 
-//          nombre de la imagen como char*.
-//Funcionamiento: Clasifica las imagenes si cumplen con cierto criterio, si es nearly black o no.
-//Salidas: listmf, el cual contiene las diferentes imagenes que fueron clasificadas.
-
-listmf *classification(listmf *photothread, int umbral, char *namefile, int maxBlack, int actual, int maxfil, int mostrar){
-	
-	pthread_mutex_lock(&mutex2);
-	for (int y = 0; y < countFil(getListMF(photothread,actual)); y++){
-		for (int x = 0; x < countColumn(getListMF(photothread,actual)); x++){
-			if (getDateMF(getListMF(photothread,actual), y, x) == 0.0000){
-				maxBlack = maxBlack + 1;
-			}
-		}
-	}
-	pthread_mutex_unlock(&mutex2);
-	pthread_barrier_wait(&barrier2);
-	if (actual == maxfil-1){
-		int cantrows = 0;
-		for (int y = 0; y < lengthListMF(photothread); y++){
-			for (int x = 0; x < countFil(getListMF(photothread,y)); x++){
-				cantrows = cantrows + 1;
-			}
-		}
-		int row = 0;
-		matrixf *mf = createMF(cantrows,countColumn(getListMF(photothread,actual)));
-		for (int z = 0; z < lengthListMF(photothread); z++){
-			for (int y = 0; y < countFil(getListMF(photothread,z)); y++){
-				for (int x = 0; x < countColumn(getListMF(photothread,z)); x++){
-					mf = setDateMF(mf,row,x,getDateMF(getListMF(photothread,z), y, x));
-				}
-				row = row + 1;
-			}
-		}
-		float porcentBlack = (maxBlack * 100.0000)/(countFil(mf) * countColumn(mf));
-
-		if(mostrar==1){
-
-			if (porcentBlack >= umbral){
-				printf("|   %s   |         yes        |\n",namefile);
-			}
-			if (porcentBlack < umbral){
-				printf("|   %s   |         no         |\n",namefile);
-			}
-			escribirPNG(namefile, mf);
-		}
-	}
-	return photothread;
-}
-
-
-//Entradas: char** datefilter, int* cont.
-//Funcionamiento: Permite convertir el filtro de 3x3, en una matriz.
-//Salidas: matrixf, que contiene el contenido del filtro en matriz.
-
-matrixf *convertFilter(char **datefilter, int cont){
+matrixF *convertFilter(char **datefilter, int cont){
 	int colfilter = 1;
 	for (int x = 0; x < strlen(datefilter[0]); x++){
 		if ((datefilter[0][x] == '-') || (datefilter[0][x] == '0') || (datefilter[0][x] == '1') 
@@ -292,7 +210,7 @@ matrixf *convertFilter(char **datefilter, int cont){
 			colfilter = colfilter + 1;
 		}
 	}
-	matrixf *filter = createMF(cont, colfilter);
+	matrixF *filter = createMF(cont, colfilter);
 	int fil = 0, col = 0, pos = 0;
 	char *digit = (char *)malloc(10*sizeof(char));
 	for (int a = 0; a < cont; a++){
@@ -323,6 +241,140 @@ matrixf *convertFilter(char **datefilter, int cont){
 	return filter;
 }
 
+/*Función que se encarga de realizar la convolución a la imágen e imprimirla si se introdujo -b*/
+/*Entrada: imagen y filtro.*/
+/*Salida: Matriz convolucionada*/
+matrixF *filtracion(matrixF *mf, matrixF *filter){
+	if ((countFil(filter) == countColumn(filter))&&(countFil(filter)%2 == 1)){
+		int increase = 0, initial = countFil(filter);
+		while (initial != 1){
+			initial = initial - 2;
+			increase = increase + 1;
+		}
+		
+		matrixF *newmf = createMF(countFil(mf),countColumn(mf));
+		for (int cont = 0; cont < increase; cont++){
+			mf = amplifyMF(mf);
+		}
+		for (int fil = increase; fil < countFil(mf) - increase; fil++){
+			for (int col = increase; col < countColumn(mf) - increase; col++){
+				float sum = 0.0000;
+				for (int y = 0; y < countFil(filter); y++){
+					for (int x = 0; x < countColumn(filter); x++){
+						float result = getDateMF(filter, y, x)*getDateMF(mf, y + fil - increase, x + col - increase);
+						sum = sum + result;
+					}
+				}
+				newmf = setDateMF(newmf, fil - increase, col - increase, sum);
+				
+			}
+		}
+		for (int cont2 = 0; cont2 < increase; cont2++){
+			mf = decreaseMF(mf);
+		}
+		
+		return newmf;
+	}
+	else{
+		return mf;
+	}
+}
+/*Función que se encarga de convertir pixeles en valores binarios (0 o 255)*/
+/*Entrada: matriz y umbral.*/
+/*Salida: Matriz binaria*/
+matrixF *binarizacion(matrixF *mf, int umbral){
+  for (int y = 0; y < countFil(mf); y++){
+    for (int x = 0; x < countColumn(mf); x++){
+      if (getDateMF(mf,y,x) <= umbral){
+        mf = setDateMF(mf, y, x, 0.0000);
+      }
+      else{
+        mf = setDateMF(mf, y, x, 255.0000);
+      }
+    }
+  }
+  
+  return mf;
+}
+// Funcion: Permite clasificar una imagene de acuerdo a un umbral
+// Entrada: Matriz resultante desde etapa de pooling, umbral ingresado por usuario y el nombre d ela imagen.
+// Salida: void
+/*void clasificacion(matrixF *mf, int umbral, char *namefile, int aux){
+	int maxBlack = 0;
+	for (int y = 0; y < countFil(mf); y++){
+		for (int x = 0; x < countColumn(mf); x++){
+			if (getDateMF(mf, y, x) == 0.0000){
+				maxBlack = maxBlack + 1;
+			}
+		}
+	}
+	float porcentBlack = (maxBlack * 100.0000)/(countFil(mf) * countColumn(mf));
+
+	if (aux == 1)
+	{
+		
+		if (porcentBlack >= umbral){
+			printf("|   %s   |         yes        |\n",namefile);
+		}
+		if (porcentBlack < umbral){
+			printf("|   %s   |         no         |\n",namefile);
+		}
+
+	}
+	strcat(namefile,"R.jpg");
+	escribirJPG(namefile, mf,countFil(mf),countColumn(mf));
+}*/
+
+//Entradas: Lista de matrices, el umbral como entero, el cual indica el punto de clasificacion, el 
+//          nombre de la imagen como char*.
+//Funcionamiento: Clasifica las imagenes si cumplen con cierto criterio, si es nearly black o no.
+//Salidas: listmf, el cual contiene las diferentes imagenes que fueron clasificadas.
+
+listmf *classification(listmf *photothread, int umbral, char *namefile, int maxBlack, int actual, int maxfil, int mostrar){
+	
+	pthread_mutex_lock(&mutex2);
+	for (int y = 0; y < countFil(getListMF(photothread,actual)); y++){
+		for (int x = 0; x < countColumn(getListMF(photothread,actual)); x++){
+			if (getDateMF(getListMF(photothread,actual), y, x) == 0.0000){
+				maxBlack = maxBlack + 1;
+			}
+		}
+	}
+	pthread_mutex_unlock(&mutex2);
+	pthread_barrier_wait(&barrier2);
+	if (actual == maxfil-1){
+		int cantrows = 0;
+		for (int y = 0; y < lengthListMF(photothread); y++){
+			for (int x = 0; x < countFil(getListMF(photothread,y)); x++){
+				cantrows = cantrows + 1;
+			}
+		}
+		int row = 0;
+		matrixF *mf = createMF(cantrows,countColumn(getListMF(photothread,actual)));
+		for (int z = 0; z < lengthListMF(photothread); z++){
+			for (int y = 0; y < countFil(getListMF(photothread,z)); y++){
+				for (int x = 0; x < countColumn(getListMF(photothread,z)); x++){
+					mf = setDateMF(mf,row,x,getDateMF(getListMF(photothread,z), y, x));
+				}
+				row = row + 1;
+			}
+		}
+		printf("Hola2 (fil %d, col %d)\n",countFil(mf),countColumn(mf));
+		float porcentBlack = (maxBlack * 100.0000)/(countFil(mf) * countColumn(mf));
+
+		if(mostrar==1){
+
+			if (porcentBlack >= umbral){
+				printf("|   %s   |         yes        |\n",namefile);
+			}
+			if (porcentBlack < umbral){
+				printf("|   %s   |         no         |\n",namefile);
+			}
+			escribirJPG(namefile, mf, cantrows, countColumn(getListMF(photothread,actual)));
+		}
+	}
+	return photothread;
+}
 
 //Entradas: Se tienen las hebras entrantes, las cuales la cantidad de las mismas son indicas por el usuario.
 //Funcionamiento: Trabaja con la hebra entrante. Si esta no posee la cantidad de filas correspondientes
@@ -339,14 +391,14 @@ void *hebraConsumidora(void* hebras){
 	int *hebra = (int *) hebras;
 	listmf *buffer = args.buffer;
 	listmf *photothread = args.photothread;
-	matrixf *filter = args.filter;
+	matrixF *filter = args.filter;
 	int *datos = args.datos;
 	char *imagenSalida=args.imagenSalida;
-	
 	if ((getListMF(photothread,*hebra)==NULL)||
-	((getListMF(photothread,*hebra)!=NULL)&&(countFil(getListMF(photothread,*hebra))<datos[2]))){
+	((getListMF(photothread,*hebra)!=NULL)&&(countFil(getListMF(photothread,*hebra))<datos[2])&&(*hebra<datos[3]-1))||
+	((getListMF(photothread,*hebra)!=NULL)&&(countFil(getListMF(photothread,*hebra))<datos[2]+datos[4])&&(*hebra==datos[3]-1))){
 		pthread_mutex_lock(&mutex);
-		matrixf *newmf;
+		matrixF *newmf;
 		int maxrow = 0;
 		for (int x=0;x<lengthListMF(buffer);x++){
 			if (((maxrow == datos[2])&&(*hebra<datos[3]-1))||((maxrow == datos[2]+datos[4])&&(*hebra==datos[3]-1))){
@@ -359,6 +411,9 @@ void *hebraConsumidora(void* hebras){
 						photothread = setListMF(photothread,newmf,*hebra);
 						buffer = setListMF(buffer,NULL,x);
 						maxrow = maxrow + 1;
+						if (countFil(getListMF(photothread,*hebra)) == datos[2]){
+							break;
+						}
 					}
 					else{
 						newmf = createMF(countFil(getListMF(photothread,*hebra))+1,countColumn(getListMF(buffer,x)));
@@ -377,6 +432,10 @@ void *hebraConsumidora(void* hebras){
 						photothread = setListMF(photothread,newmf,*hebra);
 						buffer = setListMF(buffer,NULL,x);
 						maxrow = maxrow + 1;
+						if (((countFil(getListMF(photothread,*hebra)) == datos[2])&&(*hebra<datos[3]-1))||
+						((countFil(getListMF(photothread,*hebra)) == datos[2]+datos[4])&&(*hebra==datos[3]-1))){
+							break;
+						}
 					}
 				}
 			}
@@ -392,13 +451,12 @@ void *hebraConsumidora(void* hebras){
 	else if (*hebra < 0){
 		int auxhebra = ((*hebra)*-1)-1;
 		pthread_barrier_wait(&barrier);
-		matrixf *mf=getListMF(photothread,auxhebra);
-		mf = bidirectionalConvolution(mf,filter);
-		mf = rectification(mf);
-		mf = pooling(mf);
+		matrixF *mf=getListMF(photothread,auxhebra);
+		mf = conversion(mf);
+		mf = filtracion(mf,filter);
+		mf = binarizacion(mf,datos[5]);
 		photothread = setListMF(photothread,mf,auxhebra);
 		photothread = classification(photothread,datos[0],imagenSalida,datos[1],auxhebra,datos[3], mostrar);
-		
 		args.buffer=buffer;
 		args.photothread=photothread;
 		args.filter=filter;
@@ -423,18 +481,19 @@ int main(int argc, char *argv[]){ /*Main principal de la funcion*/
     int numeroImagenes=0;
 	int numeroHebras=0;
 	int largoBuffer=0;
-	int umbral=0;
+	int umbralC=0;
+	int umbralB=0;
     int caso;
     int mostrar=0;
     while((caso=getopt(argc,argv, "c:h:u:n:b:m:f"))!= -1){
         switch(caso){
             case 'c':
         
-                strcpy(cflag, optarg); /*Numero Cantidad imagenes*/
+                strcpy(cflag, optarg); /*Cantidad de imagenes*/
         
                 break;
             case 'h':
-                strcpy(hflag, optarg); /*Numero Cantidad hebras*/
+                strcpy(hflag, optarg); /*Cantidad de hebras*/
                 break;    
 
             case 'u':
@@ -442,11 +501,11 @@ int main(int argc, char *argv[]){ /*Main principal de la funcion*/
                 break;  
 
             case 'n':
-                strcpy(nflag, optarg); /*Numero Umbral clasificacion*/
+                strcpy(nflag, optarg); /*Umbral de clasificacion*/
                 break;	
 
             case 'b':
-                strcpy(tflag, optarg); /*Numero Largo Buffer*/
+                strcpy(tflag, optarg); /*Largo del buffer*/
                 break;
 
             case 'm':
@@ -485,11 +544,12 @@ int main(int argc, char *argv[]){ /*Main principal de la funcion*/
 	}
 	rewind(filefilter);
 	fclose(filefilter);
-	matrixf *filter = convertFilter(datefilter, cont);
+	matrixF *filter = convertFilter(datefilter, cont);
     numeroImagenes = atoi(cflag);
 	numeroHebras = atoi(hflag);
 	largoBuffer = atoi(tflag);
-  	umbral = atoi(nflag);
+  	umbralC = atoi(nflag);
+	umbralB = atoi(uflag);
 
   	if(mostrar==1){
   		printf("\n|     Imagen     |     Nearly Black     |\n");
@@ -505,12 +565,7 @@ int main(int argc, char *argv[]){ /*Main principal de la funcion*/
 		pthread_barrier_init(&barrier2, NULL, numeroHebras);
 		listmf *buffer = createArrayListMF(largoBuffer); /*Lista de matrices*/
 		listmf *photothread = createArrayListMF(numeroHebras);
-		matrixf *photomf;
-		int width, height, fil, col;
-		float date;
-		png_byte color_type;
-		png_byte bit_depth;
-		png_bytep *row_pointers = NULL;
+		matrixF *photomf;
 		char cantidadImg[10];
 		char cantidadImgSalida[10];
 	    sprintf(cantidadImg,"%d",image); /*Pasar de numero a string, cantidadImagen*/
@@ -518,26 +573,26 @@ int main(int argc, char *argv[]){ /*Main principal de la funcion*/
 	    char *nombreFiltroConvolucion= mflag;
 	    char imagenArchivo[] = "imagen_";
 		char imagenSalida[] = "out_";
-	    char extension[] = ".png"; 
-	    char extension2[] = ".png";
+	    char extension[] = ".jpg"; 
+	    char extension2[] = ".jpg";
 	    strcat(imagenArchivo,cantidadImg);
 	    strcat(imagenArchivo,extension); /*imagen_1.png*/
 		strcat(imagenSalida,cantidadImgSalida);
 		strcat(imagenSalida,extension2); /*out_1.png*/
-
 		
-		
-		photomf = readPNG(imagenArchivo, photomf, width, height, color_type, bit_depth, row_pointers); /*Matriz de la imagen*/
+		photomf = leerJPG(imagenArchivo); /*Matriz de la imagen*/
 		int rowsXthread = countFil(photomf)/numeroHebras; /*Numero de filas por hebra*/
 		
 		int aditionalRows = countFil(photomf)%numeroHebras; /*Numero de filas adicionales a ultima hebra*/
 		int auxumbral = 0;
-		int *datos=(int*)malloc(5*sizeof(int));
-		datos[0]=umbral;
+		int *datos=(int*)malloc(6*sizeof(int));
+		datos[0]=umbralC;
 		datos[1]=auxumbral;
 		datos[2]=rowsXthread;
 		datos[3]=numeroHebras;
 		datos[4]=aditionalRows;
+		datos[5]=umbralB;
+
 		int *threads =(int*)malloc(numeroHebras*sizeof(int));
 		/*Se guardan los datos en la estructura*/
 		args.photothread = photothread;
@@ -548,12 +603,12 @@ int main(int argc, char *argv[]){ /*Main principal de la funcion*/
 		args.mostrar = mostrar;
 		pthread_t *hebrasConsumidoras = (pthread_t *)malloc(numeroHebras*sizeof(pthread_t));
 		for (int row=0;row<countFil(photomf);row++){
-			matrixf *aux = createMF(1, countColumn(photomf));/*Matriz de una fila de la imagen con tantas columnas, vacia*/
+			matrixF *aux = createMF(1, countColumn(photomf));/*Matriz de una fila de la imagen con tantas columnas, vacia*/
 			for (int x=0;x<countColumn(photomf);x++){
 				aux=setDateMF(aux,0,x,getDateMF(photomf,row,x));
 			}
 			args.buffer = setListMF(args.buffer,aux,row%largoBuffer);
-			if((fullListMF(args.buffer)==1)||(row==countColumn(photomf)-1)){
+			if((fullListMF(args.buffer)==1)||(row==countFil(photomf)-1)){
 				for (int thread=0;thread<numeroHebras;thread++){
 					threads[thread]=thread;
 										
@@ -575,7 +630,6 @@ int main(int argc, char *argv[]){ /*Main principal de la funcion*/
 			pthread_create(&hebrasConsumidoras[thread],NULL,&hebraConsumidora,(void *)&threads[thread]);
 		}
 		for (int thread=0;thread<numeroHebras;thread++){
-			
 			pthread_join(hebrasConsumidoras[thread],NULL);
 		}
   	}

@@ -8,44 +8,44 @@ struct matrixf{
 	struct matrixf *left;
 	struct matrixf *right;
 };
-typedef struct matrixf matrixf;
+typedef struct matrixf matrixF;
 
-//Entradas: mf, dato tipo matrixf inicial.
-//Funcionamiento: avanza una posicion a la derecha de la matrixf.
-//Salidas: mf, dato tipo matrixf en la siguiente posicion.
-matrixf *rightMF(matrixf *mf){
-	matrixf *leftmf = mf;
+//Entradas: mf, dato tipo matrixF inicial.
+//Funcionamiento: avanza una posicion a la derecha de la matrixF.
+//Salidas: mf, dato tipo matrixF en la siguiente posicion.
+matrixF *rightMF(matrixF *mf){
+	matrixF *leftmf = mf;
 	mf = mf->right;
 	leftmf->right = mf;
 	mf->left = leftmf;
 	return mf;
 }
 
-//Entradas: mf, dato tipo matrixf inicial.
-//Funcionamiento: avanza una posicion hacia abajo de la matrixf.
-//Salidas: mf, dato tipo matrixf en la siguiente posicion.
-matrixf *downMF(matrixf *mf){
-	matrixf *upmf = mf;
+//Entradas: mf, dato tipo matrixF inicial.
+//Funcionamiento: avanza una posicion hacia abajo de la matrixF.
+//Salidas: mf, dato tipo matrixF en la siguiente posicion.
+matrixF *downMF(matrixF *mf){
+	matrixF *upmf = mf;
 	mf = mf->down;
 	upmf->down = mf;
 	mf->up = upmf;
 	return mf;
 }
 
-//Entradas: mf, dato tipo matrixf inicial.
-//Funcionamiento: regresa a la posicion inicial a la izquierda de la matrixf.
-//Salidas: mf, dato tipo matrixf en la posicion inicial de la izquierda.
-matrixf *startLeftMF(matrixf *mf){
+//Entradas: mf, dato tipo matrixF inicial.
+//Funcionamiento: regresa a la posicion inicial a la izquierda de la matrixF.
+//Salidas: mf, dato tipo matrixF en la posicion inicial de la izquierda.
+matrixF *startLeftMF(matrixF *mf){
 	while (mf->left != NULL){
 		mf = mf->left;
 	}
 	return mf;
 }
 
-//Entradas: mf, dato tipo matrixf inicial.
-//Funcionamiento: regresa a la posicion inicial hacia arriba de la matrixf.
-//Salidas: mf, dato tipo matrixf en la posicion inicial de arriba.
-matrixf *startUpMF(matrixf *mf){
+//Entradas: mf, dato tipo matrixF inicial.
+//Funcionamiento: regresa a la posicion inicial hacia arriba de la matrixF.
+//Salidas: mf, dato tipo matrixF en la posicion inicial de arriba.
+matrixF *startUpMF(matrixF *mf){
 	while (mf->up != NULL){
 		mf = mf->up;
 	}
@@ -53,20 +53,20 @@ matrixf *startUpMF(matrixf *mf){
 }
 
 //Entradas: height, dato tipo int que representa la altura (cantidad de filas de la
-//          matrixf); width, dato tipo int que presenta el ancho (cantidad de columnas
-//          de la matrixf).
-//Funcionamiento: crea una matrixf con (height) cantidad de filas y (width) cantidad
-//                de columnas, donde cada dato de la matrixf inicia en 0.
-//Salidas: mf, dato tipo matrixf nueva.
-matrixf *createMF(int height, int width){
-	matrixf *mf = (matrixf *)malloc(sizeof(matrixf));
+//          matrixF); width, dato tipo int que presenta el ancho (cantidad de columnas
+//          de la matrixF).
+//Funcionamiento: crea una matrixF con (height) cantidad de filas y (width) cantidad
+//                de columnas, donde cada dato de la matrixF inicia en 0.
+//Salidas: mf, dato tipo matrixF nueva.
+matrixF *createMF(int height, int width){
+	matrixF *mf = (matrixF *)malloc(sizeof(matrixF));
 	mf->digit = 0.0000;
 	mf->up = NULL;
 	mf->down = NULL;
 	mf->left = NULL;
 	mf->right = NULL;
 	for (int cont = 0; cont < width - 1; cont++){
-		matrixf *auxmf = (matrixf *)malloc(sizeof(matrixf));
+		matrixF *auxmf = (matrixF *)malloc(sizeof(matrixF));
 		auxmf->up = NULL;
 		auxmf->down = NULL;
 		auxmf->left = NULL;
@@ -78,14 +78,14 @@ matrixf *createMF(int height, int width){
 	}
 	mf = startLeftMF(mf);
 	for (int fil = 0; fil < height - 1; fil++){
-		matrixf *newmf = (matrixf *)malloc(sizeof(matrixf));
+		matrixF *newmf = (matrixF *)malloc(sizeof(matrixF));
 		newmf->up = NULL;
 		newmf->down = NULL;
 		newmf->left = NULL;
 		newmf->right = NULL;
 		newmf->digit = 0.0000;
 		for (int col = 0; col < width - 1; col++){
-			matrixf *auxmf = (matrixf *)malloc(sizeof(matrixf));
+			matrixF *auxmf = (matrixF *)malloc(sizeof(matrixF));
 			auxmf->up = NULL;
 			auxmf->down = NULL;
 			auxmf->left = NULL;
@@ -105,12 +105,12 @@ matrixf *createMF(int height, int width){
 	return mf;
 }
 
-//Entradas: mf, dato tipo matrixf actual; fil, dato tipo int que representa la posicion en
+//Entradas: mf, dato tipo matrixF actual; fil, dato tipo int que representa la posicion en
 //          en la fila; col, dato tipo int que representa la posicion en la columna; date,
 //          dato tipo float que representa el digito flotante a agregar.
-//Funcionamiento: cambia el valor en la posicion (fil,col) de matrixf por el dato date.
-//Salidas: mf, dato tipo matrixf con el valor cambiado en la posicion especifica.
-matrixf *setDateMF(matrixf *mf, int fil,int col, float date){
+//Funcionamiento: cambia el valor en la posicion (fil,col) de matrixF por el dato date.
+//Salidas: mf, dato tipo matrixF con el valor cambiado en la posicion especifica.
+matrixF *setDateMF(matrixF *mf, int fil,int col, float date){
 	if (fil < 0){
 		fil = 0;
 	}
@@ -132,11 +132,11 @@ matrixf *setDateMF(matrixf *mf, int fil,int col, float date){
 	return mf;
 }
 
-//Entradas: mf, dato tipo matrixf actual; fil, dato tipo int que representa la posicion en
+//Entradas: mf, dato tipo matrixF actual; fil, dato tipo int que representa la posicion en
 //          en la fila; col, dato tipo int que representa la posicion en la columna.
-//Funcionamiento: obtiene el dato en la posicion (fil,col) de la matrixf.
+//Funcionamiento: obtiene el dato en la posicion (fil,col) de la matrixF.
 //Salidas: date, dato tipo float que corresponde al dato obtenido.
-float getDateMF(matrixf *mf, int fil,int col){
+float getDateMF(matrixF *mf, int fil,int col){
 	if (fil < 0){
 		fil = 0;
 	}
@@ -158,10 +158,10 @@ float getDateMF(matrixf *mf, int fil,int col){
 	return date;
 }
 
-//Entradas: mf, dato tipo matrixf actual.
-//Funcionamiento: obtiene la cantidad de filas de la matrixf.
+//Entradas: mf, dato tipo matrixF actual.
+//Funcionamiento: obtiene la cantidad de filas de la matrixF.
 //Salidas: length, dato tipo int correspondiente a la cantidad de filas.
-int countFil(matrixf *mf){
+int countFil(matrixF *mf){
 	int length = 1;
 	while (mf->down != NULL){
 		length = length + 1;
@@ -171,10 +171,10 @@ int countFil(matrixf *mf){
 	return length;
 }
 
-//Entradas: mf, dato tipo matrixf actual.
-//Funcionamiento: obtiene la cantidad de columnas de la matrixf.
+//Entradas: mf, dato tipo matrixF actual.
+//Funcionamiento: obtiene la cantidad de columnas de la matrixF.
 //Salidas: length, dato tipo int correspondiente a la cantidad de columnas.
-int countColumn(matrixf *mf){
+int countColumn(matrixF *mf){
 	int length = 1;
 	while (mf->right != NULL){
 		length = length + 1;
@@ -184,12 +184,12 @@ int countColumn(matrixf *mf){
 	return length;
 }
 
-//Entradas: mf, dato tipo matrixf actual.
+//Entradas: mf, dato tipo matrixF actual.
 //Funcionamiento: agrega 2 filas y 2 columnas con datos iniciales 0 a cada extremo correspondiente
-//                de la matrixf, aumentando la cantidad de filas en 2 y la cantidad de columnas en 2.
-//Salidas: newmf, dato tipo matrixf correspondiente a la matrixf mf ampliada.
-matrixf *amplifyMF(matrixf *mf){
-	matrixf *newMF = createMF(countFil(mf) + 2, countColumn(mf) + 2);
+//                de la matrixF, aumentando la cantidad de filas en 2 y la cantidad de columnas en 2.
+//Salidas: newmf, dato tipo matrixF correspondiente a la matrixF mf ampliada.
+matrixF *amplifyMF(matrixF *mf){
+	matrixF *newMF = createMF(countFil(mf) + 2, countColumn(mf) + 2);
 	for (int fil = 0; fil < countFil(mf); fil++){
 		for (int col = 0; col < countColumn(mf); col++){
 			newMF = setDateMF(newMF, fil + 1, col + 1, getDateMF(mf, fil, col));
@@ -198,12 +198,12 @@ matrixf *amplifyMF(matrixf *mf){
 	return newMF;
 }
 
-//Entradas: mf, dato tipo matrixf actual.
-//Funcionamiento: quita 2 filas y 2 columnas de cada uno de los extremos correspondientes de la matrixf,
+//Entradas: mf, dato tipo matrixF actual.
+//Funcionamiento: quita 2 filas y 2 columnas de cada uno de los extremos correspondientes de la matrixF,
 //                disminuyendo la cantidad de filas en 2 y la cantidad de columnas en 2.
-//Salidas: newmf, dato tipo matrixf correspondiente a la matrixf mf reducida.
-matrixf *decreaseMF(matrixf *mf){
-	matrixf *newMF = createMF(countFil(mf) - 2, countColumn(mf) - 2);
+//Salidas: newmf, dato tipo matrixF correspondiente a la matrixF mf reducida.
+matrixF *decreaseMF(matrixF *mf){
+	matrixF *newMF = createMF(countFil(mf) - 2, countColumn(mf) - 2);
 	for (int fil = 0; fil < countFil(newMF); fil++){
 		for (int col = 0; col < countColumn(newMF); col++){
 			newMF = setDateMF(newMF, fil, col, getDateMF(mf, fil + 1, col + 1));

@@ -2,16 +2,16 @@
 
 //Lista de matrices flotantes (listmf de mf).
 struct listmf{
-	matrixf *mf;
+	matrixF *mf;
 	struct listmf *next;
 	struct listmf *previous;
 };
 typedef struct listmf listmf;
 
-//Entradas: mf, dato tipo matrixf inicial.
-//Funcionamiento: crea una listmf inicial con un unico dato matrixf.
+//Entradas: mf, dato tipo matrixF inicial.
+//Funcionamiento: crea una listmf inicial con un unico dato matrixF.
 //Salidas: listmatrixf, dato tipo listmf nueva.
-listmf *createListMF(matrixf *mf){
+listmf *createListMF(matrixF *mf){
 	listmf *listmatrixf=(listmf *)malloc(sizeof(listmf));
 	listmatrixf->mf=mf;
 	listmatrixf->next=NULL;
@@ -64,14 +64,14 @@ int lengthListMF(listmf *listmatrixf){
 	return length;
 }
 
-//Entradas: listmatrixf, dato tipo listmf actual; mf, dato tipo matrixf a insertar; 
+//Entradas: listmatrixf, dato tipo listmf actual; mf, dato tipo matrixF a insertar; 
 //          pos, dato tipo int que indica la posicion a insertar.
 //Funcionamiento: inserta el dato mf en la posicion pos de listmf, incrementando su 
 //                largo. Si pos es mayor al largo de listmf, se inserta al final. Si
 //                pos es menor o igual a 0, entonces se inserta al inicio. Si listmf 
 //                tiene un solo elemento y es nulo, entonces reemplaza el elemento por mf.
 //Salidas: listmatrixf, dato tipo listmf con mf insertado.
-listmf *insertListMF(listmf *listmatrixf,matrixf *mf,int pos){
+listmf *insertListMF(listmf *listmatrixf,matrixF *mf,int pos){
 	/*if ((lengthListMF(listmatrixf)==1)&&(listmatrixf->mf==NULL)){
 		listmatrixf->mf=mf;
 		listmatrixf->next=NULL;
@@ -122,11 +122,11 @@ listmf *createArrayListMF(int length){
 	return newlistmatrixf;
 }
 
-//Entradas: listmatrixf, dato tipo listmf actual; mf, dato tipo matrixf a insertar; 
+//Entradas: listmatrixf, dato tipo listmf actual; mf, dato tipo matrixF a insertar; 
 //          pos, dato tipo int que indica la posicion a insertar.
 //Funcionamiento: cambia el dato ubicado en la posicion pos de listmf por el dato mf.
 //Salidas: listmatrixf, dato tipo listmf el dato cambiado.
-listmf *setListMF(listmf *listmatrixf, matrixf *mf,int pos){
+listmf *setListMF(listmf *listmatrixf, matrixF *mf,int pos){
 	if (pos<0){
 		pos=0;
 	}
@@ -142,9 +142,9 @@ listmf *setListMF(listmf *listmatrixf, matrixf *mf,int pos){
 
 //Entradas: listmatrixf, dato tipo listmf actual; pos, dato tipo int que indica la 
 //          posicion a insertar.
-//Funcionamiento: obtiene el dato matrixf en la posicion pos de listmf.
-//Salidas: resultmf, dato tipo matrixf obtenido de la listmf.
-matrixf *getListMF(listmf *listmatrixf,int pos){
+//Funcionamiento: obtiene el dato matrixF en la posicion pos de listmf.
+//Salidas: resultmf, dato tipo matrixF obtenido de la listmf.
+matrixF *getListMF(listmf *listmatrixf,int pos){
 	if (pos<0){
 		pos=0;
 	}
@@ -153,7 +153,7 @@ matrixf *getListMF(listmf *listmatrixf,int pos){
 		listmatrixf=nextListMF(listmatrixf);
 		x=x+1;
 	}
-	matrixf *resultmf=listmatrixf->mf;
+	matrixF *resultmf=listmatrixf->mf;
 	listmatrixf=initialListMF(listmatrixf);
 	return resultmf;
 }
