@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <pthread.h>
-#include "matrixF.h"
+#include "matrixf.h"
 #include "listmf.h"
 #include "funciones.h"
 #include <stdint.h>
@@ -55,23 +55,6 @@ pthread_barrier_t barrier2;
 //almacena el buffer.
 funciones args;
 
-
-//Entradas: Puntero de tipo png_bytep, el largo y ancho de tipo int de la matriz entrante.
-//Funcionamiento: Realiza la conversion de una matriz a escala de grises.
-//Salidas: matrixF, el cual sirve como entrada para las demas funciones.
-
-/*matrixF *grayScale(png_bytep *row_pointers, int height, int width) {
-  matrixF *mf = createMF(height, width);
-  for(int y = 0; y < height; y++) {
-    png_bytep row = row_pointers[y];
-    for(int x = 0; x < width; x++) {
-      png_bytep px = &(row[x * 4]);
-	  float prom = px[0]*0.299+px[1]*0.587+px[2]*0.114;
-	  mf = setDateMF(mf, y, x, prom);
-    }
-  }
-  return mf;
-}*/
 
 METHODDEF(void)
 my_error_exit (j_common_ptr cinfo){
@@ -296,34 +279,6 @@ matrixF *binarizacion(matrixF *mf, int umbral){
   
   return mf;
 }
-// Funcion: Permite clasificar una imagene de acuerdo a un umbral
-// Entrada: Matriz resultante desde etapa de pooling, umbral ingresado por usuario y el nombre d ela imagen.
-// Salida: void
-/*void clasificacion(matrixF *mf, int umbral, char *namefile, int aux){
-	int maxBlack = 0;
-	for (int y = 0; y < countFil(mf); y++){
-		for (int x = 0; x < countColumn(mf); x++){
-			if (getDateMF(mf, y, x) == 0.0000){
-				maxBlack = maxBlack + 1;
-			}
-		}
-	}
-	float porcentBlack = (maxBlack * 100.0000)/(countFil(mf) * countColumn(mf));
-
-	if (aux == 1)
-	{
-		
-		if (porcentBlack >= umbral){
-			printf("|   %s   |         yes        |\n",namefile);
-		}
-		if (porcentBlack < umbral){
-			printf("|   %s   |         no         |\n",namefile);
-		}
-
-	}
-	strcat(namefile,"R.jpg");
-	escribirJPG(namefile, mf,countFil(mf),countColumn(mf));
-}*/
 
 //Entradas: Lista de matrices, el umbral como entero, el cual indica el punto de clasificacion, el 
 //          nombre de la imagen como char*.
@@ -359,7 +314,7 @@ listmf *classification(listmf *photothread, int umbral, char *namefile, int maxB
 				row = row + 1;
 			}
 		}
-		printf("Hola2 (fil %d, col %d)\n",countFil(mf),countColumn(mf));
+		
 		float porcentBlack = (maxBlack * 100.0000)/(countFil(mf) * countColumn(mf));
 
 		if(mostrar==1){
